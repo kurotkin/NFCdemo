@@ -14,10 +14,18 @@ class MainActivity : AppCompatActivity() {
 
     private var nfcAdapter: NfcAdapter? = null
     private val nfcTypes = HashSet<String>().apply {
-        add(NfcAdapter.ACTION_TECH_DISCOVERED)
-        add(NfcAdapter.ACTION_TAG_DISCOVERED)
+        // Для запуска аctivity, если в метке содержится NDEF-сообщение. Он имеет самый высокий приоритет, и система будет запускать его в первую очередь.
         add(NfcAdapter.ACTION_NDEF_DISCOVERED)
+
+        // Если никаких activity для intent ACTION_NDEF_DISCOVERED не зарегистрировано, то система распознавания попробует запустить приложение с этим intent.
+        // Также этот intent будет сразу запущен, если найденное NDEF-сообщение не подходит под MIME-тип или URI, или метка совсем не содержит сообщения.
+        add(NfcAdapter.ACTION_TECH_DISCOVERED)
+
+        // Этот intent будет запущен, если два предыдущих intent не сработали.
+        add(NfcAdapter.ACTION_TAG_DISCOVERED)
+
     }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,17 +35,18 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        prepareNFC()
+    }
+
+    private fun prepareNFC(){
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
             Intent().addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_MUTABLE
         )
-        val nfcIntentFilter = IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED)
         val filters = nfcTypes.map { IntentFilter(it) }.toTypedArray()
-        //val filters = arrayOf(nfcIntentFilter)
-        val techLists =
-            arrayOf(arrayOf(Ndef::class.java.name), arrayOf(NdefFormatable::class.java.name))
+        val techLists = arrayOf(arrayOf(Ndef::class.java.name), arrayOf(NdefFormatable::class.java.name))
         nfcAdapter?.enableForegroundDispatch(this, pendingIntent, filters, techLists)
     }
 
@@ -54,6 +63,10 @@ class MainActivity : AppCompatActivity() {
                 val tagId = intent.getByteArrayExtra(NfcAdapter.EXTRA_ID)
                 val hexdump = tagId?.let { calcSerial(it) }
                 Toast.makeText(this, "Сканирован NFC $hexdump", Toast.LENGTH_LONG).show()
+
+                // EXTRA_TAG - объект Tag, описывающий отсканированную метку
+                // EXTRA_NDEF_MESSAGES - массив NDEF-сообщений, просчитанный с метки
+                // EXTRA_ID - низкоуровневый идентификатор метки
             }
         }
     }
@@ -65,6 +78,4 @@ class MainActivity : AppCompatActivity() {
             if (it.length == 1) "0$it" else it
         }
     }
-
-
 }
